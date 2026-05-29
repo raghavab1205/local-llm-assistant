@@ -1,0 +1,176 @@
+{
+  "name": "local-llm-assistant",
+  "displayName": "Local LLM Assistant",
+  "description": "AI coding assistance using locally running LLMs",
+  "version": "0.1.0",
+  "publisher": "your-publisher",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Programming Languages",
+    "Snippets"
+  ],
+  "keywords": [
+    "llm",
+    "ai",
+    "ollama",
+    "lmstudio",
+    "local",
+    "assistant"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Local LLM Assistant",
+      "properties": {
+        "localLLM.backend": {
+          "type": "string",
+          "enum": [
+            "ollama",
+            "lmstudio",
+            "llamacpp",
+            "openai-compatible"
+          ],
+          "default": "ollama",
+          "description": "Local LLM backend type"
+        },
+        "localLLM.baseUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Base URL of the local LLM server"
+        },
+        "localLLM.modelName": {
+          "type": "string",
+          "default": "llama3",
+          "description": "Model name/ID to use"
+        },
+        "localLLM.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Optional API key for compatible servers"
+        },
+        "localLLM.maxTokens": {
+          "type": "number",
+          "default": 2048,
+          "description": "Maximum tokens to generate"
+        },
+        "localLLM.temperature": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Sampling temperature"
+        },
+        "localLLM.systemPrompt": {
+          "type": "string",
+          "default": "You are a helpful AI coding assistant. You write clean, well-documented code and explain concepts clearly.",
+          "description": "System prompt for all LLM requests"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "localLLM.openChat",
+        "title": "Open Chat",
+        "category": "Local LLM"
+      },
+      {
+        "command": "localLLM.testConnection",
+        "title": "Test Connection",
+        "category": "Local LLM"
+      },
+      {
+        "command": "localLLM.explainCode",
+        "title": "Explain this code",
+        "category": "Local LLM"
+      },
+      {
+        "command": "localLLM.refactorCode",
+        "title": "Refactor this code",
+        "category": "Local LLM"
+      },
+      {
+        "command": "localLLM.generateTests",
+        "title": "Write tests for this",
+        "category": "Local LLM"
+      },
+      {
+        "command": "localLLM.fixCode",
+        "title": "Fix this code",
+        "category": "Local LLM"
+      },
+      {
+        "command": "localLLM.clearChat",
+        "title": "Clear Chat",
+        "category": "Local LLM"
+      },
+      {
+        "command": "localLLM.openSettings",
+        "title": "Open Settings",
+        "category": "Local LLM"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "localLLM.explainCode",
+          "group": "localLLM@1",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "localLLM.refactorCode",
+          "group": "localLLM@2",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "localLLM.generateTests",
+          "group": "localLLM@3",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "localLLM.fixCode",
+          "group": "localLLM@4",
+          "when": "editorHasSelection"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "localLLM",
+          "title": "Local LLM",
+          "icon": "$(hubot)"
+        }
+      ]
+    },
+    "views": {
+      "localLLM": [
+        {
+          "type": "webview",
+          "id": "localLLM.chat",
+          "name": "Chat",
+          "icon": "$(hubot)",
+          "contextualTitle": "Local LLM Chat"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "node esbuild.js --production",
+    "watch": "node esbuild.js --watch",
+    "package": "vsce package"
+},
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.19.11",
+    "typescript": "^5.3.3",
+    "@vscode/vsce": "^2.24.0"
+}
+}
