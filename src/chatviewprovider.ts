@@ -1,5 +1,8 @@
 import * as vscode from 'vscode';
 import { LLMClient, ChatMessage } from './llmClient';
+import { getAccessControlConfig, AccessLevel, isExternalAccessAllowed } from './accessControl';
+import { executeFileTool } from './fileTools';
+import { executeTerminalCommand } from './terminalRunner';
 
 export class ChatViewProvider implements vscode.WebviewViewProvider {
     private view?: vscode.WebviewView;
@@ -34,11 +37,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'ready':
                     this.updateModelInfo();
+                    this.checkConnection();
+                    this.sendAccessConfig();
                     break;
             }
         });
 
-        // Flush pending messages
         for (const msg of this.pendingMessages) {
             webviewView.webview.postMessage(msg);
         }
@@ -64,14 +68,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         </head>
         <body>
             <div id="header">
-                <span id="model-info">Loading...</span>
+                <div id="header-left">
+                    <div id="model-info">Loading...</div>
+                    <div id="status-bar">
+                        <span id="status-dot" class="disconnected"></span>
+                        <span id="status-text">Checking connection...</span>
+                    </div>
+                </div>
                 <button id="clear" title="Clear chat">Clear</button>
             </div>
+            <div id="warning-banner" style="display:none;">⚠ Terminal auto-execution is on</div>
             <div id="messages"></div>
-            <div id="loading" style="display:none; padding: 8px 12px; opacity: 0.7;">Thinking...</div>
-            <div id="input-container">
+            <div id="input-area">
                 <textarea id="input" placeholder="Ask something... (Shift+Enter for new line)"></textarea>
-                <button id="send" title="Send message">Send</button>
+                <div id="input-actions">
+                    <span id="input-status"></span>
+                    <button id="send" title="Send message">Send</button>
+                </div>
             </div>
             <script src="${scriptUri}"></script>
         </body>
@@ -80,28 +93,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     async handleUserMessage(text: string) {
         if (this.isProcessing) {
-            this.postMessage({ type: 'error', text: 'Please wait for the current response to complete.' });
+            this.postMessage({ type: 'status', status: 'error', text: 'Please wait for the current response.' });
             return;
         }
 
         this.isProcessing = true;
-        this.postMessage({ type: 'setLoading', loading: true });
-
-        // Add user message
-        this.messages.push({ role: 'user', content: text });
-        this.postMessage({ type: 'addMessage', role: 'user', content: text });
 
         try {
             if (text.startsWith('/')) {
                 await this.handleSlashCommand(text);
             } else {
-                await this.sendToLLM();
+                this.messages.push({ role: 'user', content: text });
+                this.postMessage({ type: 'addMessage', role: 'user', content: text });
             }
+            await this.runAgentLoop();
         } catch (error) {
+            this.postMessage({ type: 'status', status: 'error', text: `Error: ${error}` });
             this.postMessage({ type: 'error', text: `Error: ${error}` });
         } finally {
             this.isProcessing = false;
-            this.postMessage({ type: 'setLoading', loading: false });
         }
     }
 
@@ -148,41 +158,91 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
         if (!code && command !== '/ask') {
             this.postMessage({ type: 'addMessage', role: 'assistant', content: prompt });
+            this.postMessage({ type: 'status', status: 'idle', text: 'Ready' });
             return;
         }
 
-        await this.streamLLMResponse(prompt);
+        this.messages.push({ role: 'user', content: prompt });
+        this.postMessage({ type: 'addMessage', role: 'user', content: prompt });
     }
 
-    private async sendToLLM() {
+    private async runAgentLoop() {
         const config = this.llmClient.getConfig();
-        const systemMessage: ChatMessage = { role: 'system', content: config.systemPrompt };
-        await this.streamLLMResponseWithHistory([systemMessage, ...this.messages]);
-    }
+        const accessConfig = getAccessControlConfig();
 
-    private async streamLLMResponse(prompt: string) {
-        const config = this.llmClient.getConfig();
-        const messages: ChatMessage[] = [
-            { role: 'system', content: config.systemPrompt },
-            { role: 'user', content: prompt }
-        ];
-        await this.streamLLMResponseWithHistory(messages);
-    }
+        let iterations = 0;
+        const maxIterations = 10;
 
-    private async streamLLMResponseWithHistory(messages: ChatMessage[]) {
-        this.postMessage({ type: 'startStream' });
+        while (iterations < maxIterations) {
+            iterations++;
 
-        try {
+            const systemPrompt = buildAgentSystemPrompt(config.systemPrompt, accessConfig);
+            const messagesForLLM: ChatMessage[] = [
+                { role: 'system', content: systemPrompt },
+                ...this.messages.filter(m => m.role !== 'system')
+            ];
+
+            this.postMessage({ type: 'status', status: 'thinking', text: iterations === 1 ? 'Thinking...' : 'Using tools...' });
+
             let fullResponse = '';
-            for await (const token of this.llmClient.streamChat(messages)) {
-                fullResponse += token;
-                this.postMessage({ type: 'streamToken', token });
+            let gotFirstToken = false;
+            const slowTimeout = setTimeout(() => {
+                if (!gotFirstToken) {
+                    this.postMessage({ type: 'status', status: 'slow', text: 'Backend is slow...' });
+                }
+            }, 5000);
+
+            try {
+                for await (const token of this.llmClient.streamChat(messagesForLLM)) {
+                    if (!gotFirstToken) {
+                        clearTimeout(slowTimeout);
+                        gotFirstToken = true;
+                    }
+                    fullResponse += token;
+                }
+            } catch (error) {
+                clearTimeout(slowTimeout);
+                this.postMessage({ type: 'status', status: 'error', text: `Backend error` });
+                this.postMessage({ type: 'error', text: `Error: ${error}` });
+                break;
             }
+            clearTimeout(slowTimeout);
+
+            const tools = parseToolCalls(fullResponse);
+            if (tools.length === 0) {
+                this.postMessage({ type: 'addMessage', role: 'assistant', content: fullResponse });
+                this.messages.push({ role: 'assistant', content: fullResponse });
+                this.postMessage({ type: 'status', status: 'idle', text: 'Ready' });
+                break;
+            }
+
+            this.postMessage({ type: 'status', status: 'thinking', text: 'Executing tools...' });
             this.messages.push({ role: 'assistant', content: fullResponse });
-            this.postMessage({ type: 'endStream' });
-        } catch (error) {
-            this.postMessage({ type: 'error', text: `Error: ${error}` });
-            this.postMessage({ type: 'endStream' });
+
+            const toolResults: string[] = [];
+            for (const tool of tools) {
+                let result: any;
+                if (tool.name === 'run_terminal') {
+                    result = await executeTerminalCommand(tool.params.command || tool.params, accessConfig);
+                } else if (tool.name === 'fetch_url') {
+                    if (!isExternalAccessAllowed(accessConfig.accessLevel)) {
+                        result = { success: false, error: 'Blocked: fetch_url requires FULL access.' };
+                    } else {
+                        result = await fetchUrlTool(tool.params.url || tool.params);
+                    }
+                } else {
+                    result = await executeFileTool(tool.name, tool.params, accessConfig.accessLevel, accessConfig.nonWorkspaceFileAccess);
+                }
+                toolResults.push(`<<tool_result name="${tool.name}">${JSON.stringify(result)}</tool_result>`);
+            }
+
+            const toolResultContent = `<tool_results>\n${toolResults.join('\n')}\n</tool_results>`;
+            this.messages.push({ role: 'user', content: toolResultContent });
+        }
+
+        if (iterations >= maxIterations) {
+            this.postMessage({ type: 'error', text: 'Agent reached maximum tool iteration limit.' });
+            this.postMessage({ type: 'status', status: 'error', text: 'Max iterations reached' });
         }
     }
 
@@ -198,11 +258,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     updateConfig() {
         this.updateModelInfo();
+        this.checkConnection();
+        this.sendAccessConfig();
     }
 
     private updateModelInfo() {
         const config = this.llmClient.getConfig();
         this.postMessage({ type: 'setModelInfo', text: `${config.backend} • ${config.modelName}` });
+    }
+
+    private async checkConnection() {
+        this.postMessage({ type: 'status', status: 'thinking', text: 'Checking connection...' });
+        const result = await this.llmClient.testConnection();
+        if (result.success) {
+            this.postMessage({ type: 'status', status: 'idle', text: 'Connected' });
+        } else {
+            this.postMessage({ type: 'status', status: 'disconnected', text: 'Disconnected' });
+        }
+    }
+
+    private sendAccessConfig() {
+        const accessConfig = getAccessControlConfig();
+        this.postMessage({ type: 'accessConfig', config: accessConfig });
     }
 
     private postMessage(message: any) {
@@ -211,5 +288,77 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         } else {
             this.pendingMessages.push(message);
         }
+    }
+}
+
+function buildAgentSystemPrompt(basePrompt: string, accessConfig: ReturnType<typeof getAccessControlConfig>): string {
+    const tools = getAvailableToolsDescription(accessConfig);
+    return `${basePrompt}\n\nYou are an agentic AI assistant with access to tools. You can read, write, and manage files, run terminal commands, and fetch URLs (when permitted).\n\nCurrent access level: ${accessConfig.accessLevel}\n\nAvailable tools:\n${tools}\n\nUse tools by outputting XML tags:\n<<tool name="TOOL_NAME">{ "param1": "value1", ... }</tool>\n\nAfter using tools, you will receive <tool_result> tags with the results. Use these to formulate your final response.\n\nImportant: Only use tools when necessary. Do not make up file contents. Always verify paths exist before reading.`;
+}
+
+function getAvailableToolsDescription(accessConfig: ReturnType<typeof getAccessControlConfig>): string {
+    const allTools = [
+        { name: 'read_file', params: '{ "path": "..." }', desc: 'Read a file' },
+        { name: 'write_file', params: '{ "path": "...", "content": "..." }', desc: 'Write to a file' },
+        { name: 'create_file', params: '{ "path": "...", "content": "..." }', desc: 'Create a new file' },
+        { name: 'rename_file', params: '{ "from": "...", "to": "..." }', desc: 'Rename a file' },
+        { name: 'list_dir', params: '{ "path": "..." }', desc: 'List directory contents' },
+        { name: 'search_files', params: '{ "pattern": "...", "contains": "..." }', desc: 'Search files' },
+        { name: 'patch_file', params: '{ "path": "...", "search": "...", "replace": "..." }', desc: 'Patch a file' },
+        { name: 'run_terminal', params: '{ "command": "..." }', desc: 'Run a terminal command' },
+    ];
+
+    if (accessConfig.accessLevel === 'sandboxed' || accessConfig.accessLevel === 'full') {
+        allTools.push({ name: 'delete_file', params: '{ "path": "..." }', desc: 'Delete a file' });
+    }
+
+    if (accessConfig.accessLevel === 'full') {
+        allTools.push({ name: 'fetch_url', params: '{ "url": "..." }', desc: 'Fetch a URL' });
+    }
+
+    return allTools.map(t => `- ${t.name}: ${t.desc} ${t.params}`).join('\n');
+}
+
+function parseToolCalls(response: string): Array<{ name: string; params: any }> {
+    const tools: Array<{ name: string; params: any }> = [];
+    const regex = /<tool\s+name="([^"]+)">(.*?)<<\/tool>/gs;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(response)) !== null) {
+        try {
+            const name = match[1];
+            const paramsText = match[2].trim();
+            const params = JSON.parse(paramsText);
+            tools.push({ name, params });
+        } catch {
+            // Invalid tool format, skip
+        }
+    }
+
+    const altRegex = /<tool>(.*?)<<\/tool>/gs;
+    while ((match = altRegex.exec(response)) !== null) {
+        try {
+            const parsed = JSON.parse(match[1].trim());
+            if (parsed.name && parsed.params) {
+                tools.push({ name: parsed.name, params: parsed.params });
+            }
+        } catch {
+            // Skip
+        }
+    }
+
+    return tools;
+}
+
+async function fetchUrlTool(url: string): Promise<any> {
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeout);
+        const text = await response.text();
+        return { success: true, content: text.slice(0, 10000) };
+    } catch (error) {
+        return { success: false, error: `${error}` };
     }
 }

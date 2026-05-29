@@ -16,18 +16,66 @@ body {
 }
 
 #header {
-    padding: 8px 12px;
+    padding: 10px 12px;
     border-bottom: 1px solid var(--vscode-panel-border);
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     flex-shrink: 0;
+}
+
+#header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 #model-info {
     font-size: 0.85em;
-    opacity: 0.8;
-    font-weight: 500;
+    font-weight: 600;
+    opacity: 0.9;
+}
+
+#status-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75em;
+    opacity: 0.85;
+}
+
+#status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+    transition: background-color 0.3s ease;
+}
+
+#status-dot.idle {
+    background-color: #89d185;
+}
+
+#status-dot.thinking {
+    background-color: #3794ff;
+    animation: pulse 1.4s infinite ease-in-out;
+}
+
+#status-dot.slow {
+    background-color: #cca700;
+    animation: pulse 0.9s infinite ease-in-out;
+}
+
+#status-dot.error,
+#status-dot.disconnected {
+    background-color: #f14c4c;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+    100% { opacity: 1; transform: scale(1); }
 }
 
 #clear {
@@ -36,12 +84,23 @@ body {
     border: none;
     border-radius: 4px;
     padding: 4px 10px;
-    font-size: 0.85em;
+    font-size: 0.8em;
     cursor: pointer;
+    flex-shrink: 0;
 }
 
 #clear:hover {
     background: var(--vscode-button-secondary-hover-background);
+}
+
+#warning-banner {
+    background: var(--vscode-editorWarning-background);
+    color: var(--vscode-editorWarning-foreground);
+    padding: 6px 12px;
+    font-size: 0.8em;
+    text-align: center;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    flex-shrink: 0;
 }
 
 #messages {
@@ -106,22 +165,17 @@ body {
     border-radius: 0;
 }
 
-#loading {
-    color: var(--vscode-descriptionForeground);
-    font-style: italic;
-    flex-shrink: 0;
-}
-
-#input-container {
-    padding: 8px 12px;
+#input-area {
+    padding: 10px 12px;
     border-top: 1px solid var(--vscode-panel-border);
     display: flex;
+    flex-direction: column;
     gap: 8px;
     flex-shrink: 0;
 }
 
 #input {
-    flex: 1;
+    width: 100%;
     background: var(--vscode-input-background);
     color: var(--vscode-input-foreground);
     border: 1px solid var(--vscode-input-border);
@@ -130,8 +184,8 @@ body {
     font-family: inherit;
     font-size: inherit;
     resize: none;
-    min-height: 40px;
-    max-height: 120px;
+    min-height: 60px;
+    max-height: 160px;
     outline: none;
 }
 
@@ -139,18 +193,34 @@ body {
     border-color: var(--vscode-focusBorder);
 }
 
+#input-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#input-status {
+    font-size: 0.8em;
+    opacity: 0.7;
+    font-style: italic;
+    color: var(--vscode-descriptionForeground);
+}
+
 #send {
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
     border: none;
-    border-radius: 6px;
-    padding: 8px 14px;
+    border-radius: 4px;
+    padding: 5px 14px;
     cursor: pointer;
+    font-size: 0.8em;
     font-weight: 500;
+    line-height: 1;
+    flex-shrink: 0;
 }
 
 #send:hover:not(:disabled) {
-    background: var(--vscode-button-hoverBackground);
+    background: var(--vscode-button-hover-background);
 }
 
 #send:disabled {

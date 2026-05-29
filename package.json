@@ -2,8 +2,8 @@
   "name": "local-llm-assistant",
   "displayName": "Local LLM Assistant",
   "description": "AI coding assistance using locally running LLMs",
-  "version": "0.1.0",
-  "publisher": "your-publisher",
+  "version": "0.2.0",
+  "publisher": "Raghava-B",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -18,7 +18,8 @@
     "ollama",
     "lmstudio",
     "local",
-    "assistant"
+    "assistant",
+    "agent"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -70,6 +71,78 @@
           "type": "string",
           "default": "You are a helpful AI coding assistant. You write clean, well-documented code and explain concepts clearly.",
           "description": "System prompt for all LLM requests"
+        },
+        "localLLM.accessLevel": {
+          "type": "string",
+          "enum": [
+            "strict",
+            "sandboxed",
+            "full"
+          ],
+          "default": "strict",
+          "description": "Agent access level for file system and terminal operations"
+        },
+        "localLLM.terminalAutoExecution": {
+          "type": "string",
+          "enum": [
+            "always_proceed",
+            "proceed_in_sandbox",
+            "request_review"
+          ],
+          "default": "request_review",
+          "description": "How terminal commands are handled by the agent"
+        },
+        "localLLM.shellIntegrationEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "When enabled, agent uses VS Code's shell integration API for richer terminal output capture"
+        },
+        "localLLM.nonWorkspaceFileAccess": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow agent to access files outside the workspace root. Only functional when accessLevel is 'full'."
+        },
+        "localLLM.terminalDenyList": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "rm -rf /",
+            "rm -rf ~",
+            "mkfs.*",
+            "dd if=.*",
+            "curl.*|.*sh",
+            "wget.*|.*sh",
+            ":(){ :|:& };:"
+          ],
+          "description": "Commands that are always blocked from terminal execution"
+        },
+        "localLLM.terminalAllowList": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "npm *",
+            "npx *",
+            "python *",
+            "pip *",
+            "cargo *",
+            "go *",
+            "git *"
+          ],
+          "description": "Commands that auto-proceed in Sandboxed mode with proceed_in_sandbox"
+        },
+        "localLLM.logAgentActions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Log all agent actions to the output channel"
+        },
+        "localLLM.snapshotsEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable file snapshots before agent modifications"
         }
       }
     },
@@ -111,7 +184,12 @@
       },
       {
         "command": "localLLM.openSettings",
-        "title": "Open Settings",
+        "title": "Open Agent Settings",
+        "category": "Local LLM"
+      },
+      {
+        "command": "localLLM.changeAccessLevel",
+        "title": "Change Access Level",
         "category": "Local LLM"
       }
     ],
@@ -165,12 +243,12 @@
     "compile": "node esbuild.js --production",
     "watch": "node esbuild.js --watch",
     "package": "vsce package"
-},
+  },
   "devDependencies": {
     "@types/node": "^18.19.0",
     "@types/vscode": "^1.85.0",
     "esbuild": "^0.19.11",
     "typescript": "^5.3.3",
     "@vscode/vsce": "^2.24.0"
-}
+  }
 }

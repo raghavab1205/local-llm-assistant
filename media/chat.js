@@ -6,7 +6,10 @@
     const sendBtn = document.getElementById('send');
     const clearBtn = document.getElementById('clear');
     const modelInfo = document.getElementById('model-info');
-    const loading = document.getElementById('loading');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const inputStatus = document.getElementById('input-status');
+    const warningBanner = document.getElementById('warning-banner');
 
     let currentAssistantMessage = null;
 
@@ -18,24 +21,13 @@
 
     function renderMarkdown(text) {
         let html = escapeHtml(text);
-
-        // Code blocks
         html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
             return `<pre><code class="language-${lang || 'text'}">${code}</code></pre>`;
         });
-
-        // Inline code
         html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-        // Bold
         html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-        // Italic
         html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-        // Line breaks
         html = html.replace(/\n/g, '<br>');
-
         return html;
     }
 
@@ -74,16 +66,28 @@
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
-    function setLoading(isLoading) {
-        loading.style.display = isLoading ? 'block' : 'none';
-        input.disabled = isLoading;
-        sendBtn.disabled = isLoading;
+    function updateStatus(status, text) {
+        statusDot.className = 'status-dot ' + status;
+        statusText.textContent = text;
+
+        if (status === 'thinking' || status === 'slow') {
+            inputStatus.textContent = text;
+            input.disabled = true;
+            sendBtn.disabled = true;
+        } else if (status === 'error' || status === 'disconnected') {
+            inputStatus.textContent = text;
+            input.disabled = false;
+            sendBtn.disabled = false;
+        } else {
+            inputStatus.textContent = '';
+            input.disabled = false;
+            sendBtn.disabled = false;
+        }
     }
 
     function sendMessage() {
         const text = input.value.trim();
         if (!text || input.disabled) return;
-        addMessage('user', text);
         input.value = '';
         vscode.postMessage({ type: 'sendMessage', text });
     }
@@ -119,8 +123,8 @@
             case 'setModelInfo':
                 modelInfo.textContent = message.text;
                 break;
-            case 'setLoading':
-                setLoading(message.loading);
+            case 'status':
+                updateStatus(message.status, message.text);
                 break;
             case 'clearChat':
                 messagesContainer.innerHTML = '';
@@ -129,9 +133,15 @@
                 addMessage('error', message.text);
                 finishStreaming();
                 break;
+            case 'accessConfig':
+                if (message.config.terminalAutoExecution === 'always_proceed') {
+                    warningBanner.style.display = 'block';
+                } else {
+                    warningBanner.style.display = 'none';
+                }
+                break;
         }
     });
 
-    // Notify extension that webview is ready
     vscode.postMessage({ type: 'ready' });
 })();

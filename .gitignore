@@ -1,0 +1,95 @@
+# ============================================
+# SECURITY — NEVER COMMIT THESE
+# ============================================
+
+# Credentials & Secrets
+.env
+.env.*
+.envrc
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.key
+*.cert
+*.crt
+*secret*
+*credential*
+*password*
+*token*
+id_rsa
+id_rsa.pub
+id_ecdsa
+id_ecdsa.pub
+id_ed25519
+id_ed25519.pub
+known_hosts
+.ssh/
+.aws/
+.azure/
+.gcp/
+.kube/
+
+# VS Code / Extension specific credentials
+StudioCodeCredential*
+*Credential*
+*AccessToken*
+*access_token*
+*refresh_token*
+*.vsixtoken
+*.pat
+
+# ============================================
+# NODE / NPM
+# ============================================
+
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ============================================
+# BUILD / OUTPUT
+# ============================================
+
+out/
+dist/
+build/
+*.vsix
+*.map        # source maps can leak original paths and sometimes tokens
+*.tsbuildinfo
+
+# ============================================
+# TESTING
+# ============================================
+
+coverage/
+.nyc_output/
+.vscode-test/
+
+# ============================================
+# OS / EDITOR
+# ============================================
+
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/settings.json
+.vscode/tasks.json
+.vscode/launch.json
+!.vscode/extensions.json
+
+# ============================================
+# EXTENSION SPECIFIC
+# ============================================
+
+.local-llm-snapshots/
+local-llm-logs/

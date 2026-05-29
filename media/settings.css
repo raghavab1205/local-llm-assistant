@@ -1,0 +1,214 @@
+body {
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    color: var(--vscode-foreground);
+    background: var(--vscode-editor-background);
+    padding: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+h1 {
+    font-size: 1.5em;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    padding-bottom: 10px;
+}
+
+section {
+    margin-bottom: 30px;
+}
+
+h2 {
+    font-size: 1.1em;
+    margin-bottom: 12px;
+}
+
+.cards {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.card {
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 8px;
+    padding: 16px;
+    cursor: pointer;
+    flex: 1;
+    min-width: 200px;
+    transition: all 0.2s;
+    background: var(--vscode-editor-inactiveSelectionBackground);
+}
+
+.card:hover {
+    border-color: var(--vscode-focusBorder);
+}
+
+.card.active {
+    border-color: var(--vscode-focusBorder);
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+}
+
+.card-icon {
+    font-size: 1.5em;
+    margin-bottom: 8px;
+}
+
+.card-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.card-desc {
+    font-size: 0.85em;
+    opacity: 0.8;
+}
+
+.field {
+    margin-bottom: 16px;
+}
+
+label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+select {
+    background: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    border: 1px solid var(--vscode-dropdown-border);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-family: inherit;
+    font-size: inherit;
+    width: 100%;
+    max-width: 400px;
+}
+
+.hint {
+    font-size: 0.85em;
+    opacity: 0.7;
+    margin-top: 4px;
+}
+
+.hint.warning {
+    color: var(--vscode-editorWarning-foreground);
+}
+
+.toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.toggle input {
+    display: none;
+}
+
+.toggle-slider {
+    width: 36px;
+    height: 20px;
+    background: var(--vscode-button-secondary-background);
+    border-radius: 10px;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.toggle-slider::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s;
+}
+
+.toggle input:checked + .toggle-slider {
+    background: var(--vscode-button-background);
+}
+
+.toggle input:checked + .toggle-slider::after {
+    transform: translateX(16px);
+}
+
+.toggle input:disabled + .toggle-slider {
+    opacity: 0.5;
+}
+
+.tag-input {
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 4px;
+    padding: 8px;
+    background: var(--vscode-input-background);
+}
+
+.tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.tag {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tag .remove {
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+.tag .remove:hover {
+    opacity: 1;
+}
+
+.tag-input input {
+    background: transparent;
+    border: none;
+    color: var(--vscode-input-foreground);
+    font-family: inherit;
+    font-size: inherit;
+    width: 100%;
+    outline: none;
+}
+
+.danger {
+    border: 1px solid var(--vscode-inputValidation-errorBorder);
+    border-radius: 8px;
+    padding: 16px;
+    background: var(--vscode-inputValidation-errorBackground);
+}
+
+.danger h2 {
+    color: var(--vscode-inputValidation-errorForeground);
+}
+
+.danger-btn {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    border-radius: 4px;
+    padding: 8px 14px;
+    margin-right: 10px;
+    margin-bottom: 8px;
+    cursor: pointer;
+}
+
+.danger-btn:hover {
+    background: var(--vscode-button-hoverBackground);
+}

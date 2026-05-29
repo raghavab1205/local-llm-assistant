@@ -3,20 +3,21 @@ import { LLMClient } from './llmClient';
 import { ChatViewProvider } from './chatviewprovider';
 import { StatusBarManager } from './statusBar';
 import { registerCodeActions } from './codeActions';
+import { SettingsProvider } from './settingsProvider';
+import { getAccessControlConfig, AccessLevel, getAccessLevelLabel, clearApprovedPatterns } from './accessControl';
 
 export function activate(context: vscode.ExtensionContext) {
     const llmClient = new LLMClient();
     const chatProvider = new ChatViewProvider(context.extensionUri, llmClient);
     const statusBar = new StatusBarManager(llmClient);
+    const settingsProvider = new SettingsProvider(context);
 
-    // Register chat view provider
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider('localLLM.chat', chatProvider, {
             webviewOptions: { retainContextWhenHidden: true }
         })
     );
 
-    // Register commands
     context.subscriptions.push(
         vscode.commands.registerCommand('localLLM.openChat', () => {
             vscode.commands.executeCommand('localLLM.chat.focus');
@@ -32,19 +33,42 @@ export function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand('localLLM.clearChat', () => {
             chatProvider.clearChat();
+            clearApprovedPatterns();
         }),
         vscode.commands.registerCommand('localLLM.openSettings', () => {
-            vscode.commands.executeCommand('workbench.action.openSettings', 'localLLM');
+            settingsProvider.show();
+        }),
+        vscode.commands.registerCommand('localLLM.changeAccessLevel', async () => {
+            const levels: AccessLevel[] = ['strict', 'sandboxed', 'full'];
+            const items = levels.map(level => ({
+                label: getAccessLevelLabel(level),
+                description: level,
+                level
+            }));
+            const picked = await vscode.window.showQuickPick(items, {
+                placeHolder: 'Select access level for the Local LLM Agent'
+            });
+            if (picked) {
+                if (picked.level === 'full') {
+                    const confirmed = await vscode.window.showWarningMessage(
+                        'Full Access gives the agent unrestricted access to your machine and external resources. All actions are logged. Continue?',
+                        { modal: true },
+                        'Continue',
+                        'Cancel'
+                    );
+                    if (confirmed !== 'Continue') return;
+                }
+                await vscode.workspace.getConfiguration('localLLM').update('accessLevel', picked.level, true);
+                vscode.window.showInformationMessage(`Access level changed to ${picked.label}`);
+                statusBar.update();
+                chatProvider.updateConfig();
+            }
         })
     );
 
-    // Register code actions
     registerCodeActions(context, llmClient, chatProvider);
-
-    // Register status bar
     context.subscriptions.push(statusBar);
 
-    // Update status bar and validate settings on activation
     statusBar.update();
 
     const config = vscode.workspace.getConfiguration('localLLM');
@@ -54,12 +78,11 @@ export function activate(context: vscode.ExtensionContext) {
             'Open Settings'
         ).then(selection => {
             if (selection === 'Open Settings') {
-                vscode.commands.executeCommand('workbench.action.openSettings', 'localLLM');
+                vscode.commands.executeCommand('localLLM.openSettings');
             }
         });
     }
 
-    // Listen for configuration changes
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration(e => {
             if (e.affectsConfiguration('localLLM')) {
